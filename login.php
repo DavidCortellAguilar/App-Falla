@@ -83,10 +83,6 @@ include __DIR__ . '/header.php';
             >
         </div>
 
-        <div class="alert alert-light border small mb-4">
-            Accede únicamente con tu DNI. La contraseña ya no es necesaria para los falleros.
-        </div>
-
         <?= turnstile_widget() ?>
 
         <button class="btn btn-primary w-100 btn-lg" type="submit">
@@ -94,9 +90,7 @@ include __DIR__ . '/header.php';
         </button>
     </form>
 
-    <div class="text-center mt-3">
-        <a href="registro.php" class="btn btn-light w-100">Nuevo fallero / Solicitar alta</a>
-    </div>
+    
     
     
 </div>

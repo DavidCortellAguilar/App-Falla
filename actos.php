@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_admin();
+ensure_audit_columns($pdo);
 
 $page_title = 'Actos';
 
@@ -50,9 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (($_POST['action'] ?? '') === 'delete') {
         $idDelete = (int) $_POST['id'];
 
-        $stmt = $pdo->prepare("SELECT imagen FROM actos WHERE id=:id");
+        $stmt = $pdo->prepare("SELECT titulo, imagen FROM actos WHERE id=:id");
         $stmt->execute(['id' => $idDelete]);
         $actoDelete = $stmt->fetch();
+        $actoTituloDelete = $actoDelete['titulo'] ?? ('ID ' . $idDelete);
 
         if (!empty($actoDelete['imagen'])) {
             $rutaImagen = __DIR__ . '/' . $actoDelete['imagen'];
@@ -62,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->prepare("DELETE FROM actos WHERE id=:id")->execute(['id' => $idDelete]);
-        log_activity($pdo, 'delete', 'actos', 'Acto eliminado');
+        log_activity($pdo, 'Eliminado', 'actos', 'Acto eliminado: ' . $actoTituloDelete, $idDelete, $actoTituloDelete);
         redirect('actos.php');
     }
 
@@ -98,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $data['id'] = $id;
+        $data['updated_by'] = current_user_id();
 
         $pdo->prepare("
             UPDATE actos
@@ -110,13 +113,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 tipo=:tipo,
                 max_plazas=:max_plazas,
                 estado=:estado,
-                updated_at=NOW()
+                updated_at=NOW(),
+                updated_by=:updated_by
             WHERE id=:id
         ")->execute($data);
 
         $actoId = $id;
     } else {
-        $data['created_by'] = $_SESSION['user_id'];
+        $data['created_by'] = current_user_id();
 
         $pdo->prepare("
             INSERT INTO actos 
@@ -199,7 +203,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    log_activity($pdo, 'save', 'actos', 'Acto guardado');
+    log_activity(
+        $pdo,
+        $esNuevoActo ? 'Creado' : 'Modificado',
+        'actos',
+        ($esNuevoActo ? 'Acto creado: ' : 'Acto modificado: ') . $data['titulo'],
+        $actoId,
+        $data['titulo']
+    );
 
     if ($esNuevoActo) {
         require_once __DIR__ . '/enviar-notificacion.php';
@@ -231,6 +242,8 @@ if (!empty($_GET['edit'])) {
 
 $actos = $pdo->query("
     SELECT a.*,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cu_f.nombre, cu_f.apellidos)), ''), cu.dni, 'Sistema') AS creado_por_nombre,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', uu_f.nombre, uu_f.apellidos)), ''), uu.dni, 'Sin editar') AS editado_por_nombre,
            (
                SELECT COUNT(*) FROM reservas r
                WHERE r.acto_id = a.id AND r.estado = 'confirmada'
@@ -246,6 +259,10 @@ $actos = $pdo->query("
            COUNT(DISTINCT oc.id) AS opciones
     FROM actos a
     LEFT JOIN opciones_comida oc ON oc.acto_id = a.id AND oc.is_active = 1
+    LEFT JOIN users cu ON cu.id = a.created_by
+    LEFT JOIN falleros cu_f ON cu_f.id = cu.fallero_id
+    LEFT JOIN users uu ON uu.id = a.updated_by
+    LEFT JOIN falleros uu_f ON uu_f.id = uu.fallero_id
     GROUP BY a.id
     ORDER BY a.created_at DESC, a.id DESC
 ")->fetchAll();
@@ -523,7 +540,7 @@ include __DIR__ . '/sidebar.php';
                             <div class="acto-card-link">Ver detalle y recuentos →</div>
                         </a>
 
-                        <div class="acto-card-actions">
+                            <div class="acto-card-actions">
                             <a class="btn btn-sm btn-light" href="actos.php?edit=<?= (int) $acto['id'] ?>">Editar</a>
 
                             <form method="post" onsubmit="return confirm('¿Eliminar acto?')">

@@ -1,18 +1,26 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_admin();
+ensure_audit_columns($pdo);
 $page_title = 'Familias';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
 
     if (($_POST['action'] ?? '') === 'delete') {
-        $pdo->prepare("DELETE FROM familias WHERE id=:id")->execute(['id' => (int) $_POST['id']]);
-        log_activity($pdo, 'delete', 'familias', 'Familia eliminada');
+        $idDelete = (int) $_POST['id'];
+        $stmt = $pdo->prepare("SELECT nombre FROM familias WHERE id=:id");
+        $stmt->execute(['id' => $idDelete]);
+        $familiaDelete = $stmt->fetch();
+        $familiaNombreDelete = $familiaDelete['nombre'] ?? ('ID ' . $idDelete);
+
+        $pdo->prepare("DELETE FROM familias WHERE id=:id")->execute(['id' => $idDelete]);
+        log_activity($pdo, 'Eliminado', 'familias', 'Familia eliminada: ' . $familiaNombreDelete, $idDelete, $familiaNombreDelete);
         redirect('familias.php');
     }
 
     $id = (int) ($_POST['id'] ?? 0);
+    $esNuevaFamilia = $id === 0;
     $representante1 = !empty($_POST['representante_1_id']) ? (int) $_POST['representante_1_id'] : null;
     $representante2 = !empty($_POST['representante_2_id']) ? (int) $_POST['representante_2_id'] : null;
 
@@ -43,9 +51,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $data['id'] = $id;
-        $pdo->prepare("UPDATE familias SET nombre=:nombre, representante_fallero_id=:representante_fallero_id, observaciones=:observaciones, updated_at=NOW() WHERE id=:id")->execute($data);
+        $data['updated_by'] = current_user_id();
+        $pdo->prepare("UPDATE familias SET nombre=:nombre, representante_fallero_id=:representante_fallero_id, observaciones=:observaciones, updated_at=NOW(), updated_by=:updated_by WHERE id=:id")->execute($data);
     } else {
-        $pdo->prepare("INSERT INTO familias (nombre, representante_fallero_id, observaciones) VALUES (:nombre, :representante_fallero_id, :observaciones)")->execute($data);
+        $data['created_by'] = current_user_id();
+        $pdo->prepare("INSERT INTO familias (nombre, representante_fallero_id, observaciones, created_by) VALUES (:nombre, :representante_fallero_id, :observaciones, :created_by)")->execute($data);
     }
 
     $familiaIdGuardada = $id ?: (int) $pdo->lastInsertId();
@@ -58,7 +68,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    log_activity($pdo, 'save', 'familias', 'Familia guardada');
+    log_activity(
+        $pdo,
+        $esNuevaFamilia ? 'Creado' : 'Modificado',
+        'familias',
+        ($esNuevaFamilia ? 'Familia creada: ' : 'Familia modificada: ') . $data['nombre'],
+        $familiaIdGuardada,
+        $data['nombre']
+    );
     redirect('familias.php');
 }
 
@@ -82,10 +99,16 @@ if (!empty($_GET['edit'])) {
 
 $familias = $pdo->query("
     SELECT fa.*, CONCAT(f.apellidos, ', ', f.nombre) AS representante_principal,
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cu_f.nombre, cu_f.apellidos)), ''), cu.dni, 'Sistema') AS creado_por_nombre,
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', uu_f.nombre, uu_f.apellidos)), ''), uu.dni, 'Sin editar') AS editado_por_nombre,
     (SELECT GROUP_CONCAT(CONCAT(fr_f.apellidos, ', ', fr_f.nombre) ORDER BY fr.created_at ASC, fr.fallero_id ASC SEPARATOR '<br>') FROM familia_representantes fr INNER JOIN falleros fr_f ON fr_f.id=fr.fallero_id WHERE fr.familia_id=fa.id) AS representantes,
     (SELECT COUNT(*) FROM falleros ff WHERE ff.familia_id = fa.id) AS miembros
     FROM familias fa
     LEFT JOIN falleros f ON f.id = fa.representante_fallero_id
+    LEFT JOIN users cu ON cu.id = fa.created_by
+    LEFT JOIN falleros cu_f ON cu_f.id = cu.fallero_id
+    LEFT JOIN users uu ON uu.id = fa.updated_by
+    LEFT JOIN falleros uu_f ON uu_f.id = uu.fallero_id
     ORDER BY fa.nombre
 ")->fetchAll();
 
@@ -163,7 +186,7 @@ include __DIR__ . '/sidebar.php';
     <div class="col-lg-8">
         <div class="card-modern table-card">
             <table class="table align-middle">
-                <thead><tr><th>Familia</th><th>Representantes</th><th>Miembros</th><th></th></tr></thead>
+                <thead><tr><th>Familia</th><th>Representantes</th><th>Miembros</th><th>Auditoría</th><th></th></tr></thead>
                 <tbody>
                 <?php foreach ($familias as $familia): ?>
                     <tr>

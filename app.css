@@ -1749,3 +1749,45 @@ a { text-decoration: none; }
         padding-right: 24px !important;
     }
 }
+
+.family-toggle-box {
+    background: rgba(13, 110, 253, 0.08);
+    border: 1px solid #0d6efd;
+    border-radius: 12px;
+    padding: 15px 18px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.family-toggle-box:hover {
+    background: rgba(13, 110, 253, 0.12);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+}
+
+.family-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-weight: 600;
+    color: #0d47a1;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.family-toggle-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.family-toggle-box small {
+    margin-top: 8px;
+    color: #4f6b8a !important;
+    line-height: 1.4;
+}
+
+.family-toggle-label i {
+    color: #0d6efd;
+    font-size: 1.2rem;
+}

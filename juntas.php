@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_admin();
+ensure_audit_columns($pdo);
 
 $page_title = 'Juntas';
 
@@ -15,6 +16,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (($_POST['action'] ?? '') === 'delete') {
         $idDel = (int) $_POST['id'];
 
+        $stmtJunta = $pdo->prepare("SELECT nombre FROM juntas WHERE id = :id");
+        $stmtJunta->execute(['id' => $idDel]);
+        $juntaDelete = $stmtJunta->fetch();
+        $juntaNombreDelete = $juntaDelete['nombre'] ?? ('ID ' . $idDel);
+
         $stmtArch = $pdo->prepare("SELECT ruta FROM junta_archivos WHERE junta_id = :id");
         $stmtArch->execute(['id' => $idDel]);
         foreach ($stmtArch->fetchAll() as $arch) {
@@ -24,12 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $pdo->prepare("DELETE FROM junta_archivos WHERE junta_id = :id")->execute(['id' => $idDel]);
         $pdo->prepare("DELETE FROM juntas WHERE id = :id")->execute(['id' => $idDel]);
-        log_activity($pdo, 'delete', 'juntas', 'Junta eliminada');
+        log_activity($pdo, 'Eliminado', 'juntas', 'Junta eliminada: ' . $juntaNombreDelete, $idDel, $juntaNombreDelete);
         redirect('juntas.php');
     }
 
     // Crear / editar junta
     $id      = (int) ($_POST['id'] ?? 0);
+    $esNuevaJunta = $id === 0;
 
     $data = [
         'nombre'      => trim($_POST['nombre'] ?? ''),
@@ -43,18 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $data['id'] = $id;
+        $data['updated_by'] = current_user_id();
         $pdo->prepare("
             UPDATE juntas
             SET nombre      = :nombre,
                 fecha       = :fecha,
                 descripcion = :descripcion,
-                updated_at  = NOW()
+                updated_at  = NOW(),
+                updated_by  = :updated_by
             WHERE id = :id
         ")->execute($data);
 
         $juntaId = $id;
     } else {
-        $data['created_by'] = $_SESSION['user_id'];
+        $data['created_by'] = current_user_id();
         $pdo->prepare("
             INSERT INTO juntas (nombre, fecha, descripcion, created_by)
             VALUES (:nombre, :fecha, :descripcion, :created_by)
@@ -73,11 +82,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'junta_id'        => $juntaId,
             'nombre_original' => $_FILES['archivo']['name'],
             'ruta'            => $rutaArchivo,
-            'created_by'      => $_SESSION['user_id'],
+            'created_by'      => current_user_id(),
         ]);
     }
 
-    log_activity($pdo, 'save', 'juntas', 'Junta guardada');
+    log_activity(
+        $pdo,
+        $esNuevaJunta ? 'Creado' : 'Modificado',
+        'juntas',
+        ($esNuevaJunta ? 'Junta creada: ' : 'Junta modificada: ') . $data['nombre'],
+        $juntaId,
+        $data['nombre']
+    );
     redirect('junta_detalle.php?id=' . $juntaId);
 }
 
@@ -92,6 +108,8 @@ if (!empty($_GET['edit'])) {
 // ── Listado ──────────────────────────────────────────────────────────────────
 $juntas = $pdo->query("
     SELECT j.*,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cu_f.nombre, cu_f.apellidos)), ''), cu.dni, 'Sistema') AS creado_por_nombre,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', uu_f.nombre, uu_f.apellidos)), ''), uu.dni, 'Sin editar') AS editado_por_nombre,
            COALESCE(a.total_archivos, 0) AS total_archivos
     FROM juntas j
     LEFT JOIN (
@@ -99,6 +117,10 @@ $juntas = $pdo->query("
         FROM junta_archivos
         GROUP BY junta_id
     ) a ON a.junta_id = j.id
+    LEFT JOIN users cu ON cu.id = j.created_by
+    LEFT JOIN falleros cu_f ON cu_f.id = cu.fallero_id
+    LEFT JOIN users uu ON uu.id = j.updated_by
+    LEFT JOIN falleros uu_f ON uu_f.id = uu.fallero_id
     ORDER BY j.fecha DESC, j.created_at DESC
 ")->fetchAll();
 
@@ -193,7 +215,7 @@ include __DIR__ . '/sidebar.php';
                                     <span>🗓 <?= e(date('d/m/Y', strtotime($junta['created_at']))) ?></span>
                                 </div>
 
-                                <div class="acto-card-link">Ver documentos →</div>
+                                    <div class="acto-card-link">Ver documentos →</div>
                             </a>
 
                             <div class="acto-card-actions">

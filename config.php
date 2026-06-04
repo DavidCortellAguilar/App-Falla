@@ -48,9 +48,9 @@ header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 
 $DB_HOST = 'localhost';
-$DB_NAME = 'u287751603_falla';
-$DB_USER = 'u287751603_falla';
-$DB_PASS = 'Eloimiquel44';
+$DB_NAME = 'u104777796_falla';
+$DB_USER = 'u104777796_falla';
+$DB_PASS = 'SanSebastian26';
 
 try {
     $pdo = new PDO(
@@ -192,20 +192,118 @@ function check_turnstile(): void
     }
 }
 
-function log_activity(PDO $pdo, string $accion, string $modulo, string $descripcion = ''): void
+
+function current_user_id(): ?int
 {
+    return isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
+}
+
+function audit_user_sql(string $alias): string
+{
+    return "COALESCE(NULLIF(TRIM(CONCAT_WS(' ', {$alias}f.nombre, {$alias}f.apellidos)), ''), {$alias}u.dni, 'Sistema')";
+}
+
+function audit_html(?string $createdName, ?string $createdAt, ?string $updatedName = null, ?string $updatedAt = null): string
+{
+    $html = '<div class="small text-muted mt-2">';
+    if ($createdName || $createdAt) {
+        $html .= 'Creado por <strong>' . e($createdName ?: 'Sistema') . '</strong>';
+        if ($createdAt) {
+            $html .= ' · ' . e(date('d/m/Y H:i', strtotime($createdAt)));
+        }
+    }
+    if ($updatedName || $updatedAt) {
+        $html .= '<br>Editado por <strong>' . e($updatedName ?: 'Sistema') . '</strong>';
+        if ($updatedAt) {
+            $html .= ' · ' . e(date('d/m/Y H:i', strtotime($updatedAt)));
+        }
+    }
+    $html .= '</div>';
+    return $html;
+}
+
+function ensure_audit_columns(PDO $pdo): void
+{
+    $statements = [
+        "ALTER TABLE actos ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
+        "ALTER TABLE avisos ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
+        "ALTER TABLE juntas ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
+        "ALTER TABLE falleros ADD COLUMN IF NOT EXISTS created_by INT(11) DEFAULT NULL AFTER familia_id",
+        "ALTER TABLE falleros ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
+        "ALTER TABLE familias ADD COLUMN IF NOT EXISTS created_by INT(11) DEFAULT NULL AFTER observaciones",
+        "ALTER TABLE familias ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
+        "ALTER TABLE reservas ADD COLUMN IF NOT EXISTS created_by INT(11) DEFAULT NULL AFTER observaciones",
+        "ALTER TABLE reservas ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
+        "ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS registro_id INT(11) DEFAULT NULL AFTER modulo",
+        "ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS registro_nombre VARCHAR(255) DEFAULT NULL AFTER registro_id",
+    ];
+
+    foreach ($statements as $sql) {
+        try { $pdo->exec($sql); } catch (Throwable $e) { /* Si el hosting no permite ALTER automático, usar audit_migration.sql */ }
+    }
+}
+
+function log_activity(PDO $pdo, string $accion, string $modulo, string $descripcion = '', ?int $registroId = null, ?string $registroNombre = null): void
+{
+    // La auditoría solo debe guardar acciones realizadas por administradores.
+    // No registramos accesos, perfil ni acciones de falleros/usuarios normales.
+    $modulosIgnorados = ['auth', 'perfil'];
+    if (!is_admin() || in_array($modulo, $modulosIgnorados, true)) {
+        return;
+    }
+
+    $userId = $_SESSION['user_id'] ?? null;
+    if (!$userId) {
+        return;
+    }
+
+    // Comprobación adicional contra base de datos por seguridad.
+    $check = $pdo->prepare("SELECT role FROM users WHERE id = :id AND is_active = 1 LIMIT 1");
+    $check->execute(['id' => $userId]);
+    if ($check->fetchColumn() !== 'admin') {
+        return;
+    }
+
+    $accion = audit_action_label($accion);
+
     $stmt = $pdo->prepare("
-        INSERT INTO activity_logs (user_id, accion, modulo, descripcion, ip_address, user_agent)
-        VALUES (:user_id, :accion, :modulo, :descripcion, :ip, :ua)
+        INSERT INTO activity_logs (user_id, accion, modulo, registro_id, registro_nombre, descripcion)
+        VALUES (:user_id, :accion, :modulo, :registro_id, :registro_nombre, :descripcion)
     ");
     $stmt->execute([
-        'user_id' => $_SESSION['user_id'] ?? null,
+        'user_id' => $userId,
         'accion' => $accion,
         'modulo' => $modulo,
+        'registro_id' => $registroId,
+        'registro_nombre' => $registroNombre !== null ? mb_substr($registroNombre, 0, 255) : null,
         'descripcion' => $descripcion,
-        'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
-        'ua' => $_SERVER['HTTP_USER_AGENT'] ?? null,
     ]);
+}
+
+function audit_action_label(string $accion): string
+{
+    $accion = trim($accion);
+    $map = [
+        'create' => 'Creado',
+        'created' => 'Creado',
+        'crear' => 'Creado',
+        'update' => 'Modificado',
+        'updated' => 'Modificado',
+        'edit' => 'Modificado',
+        'editar' => 'Modificado',
+        'save' => 'Modificado',
+        'guardar' => 'Modificado',
+        'delete' => 'Eliminado',
+        'deleted' => 'Eliminado',
+        'eliminar' => 'Eliminado',
+        'approve' => 'Aprobado',
+        'reject' => 'Rechazado',
+        'cancel' => 'Cancelado',
+        'pago' => 'Pago',
+    ];
+
+    $key = strtolower($accion);
+    return $map[$key] ?? ucfirst($accion);
 }
 
 function redirect(string $url): void

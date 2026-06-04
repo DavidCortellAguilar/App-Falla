@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_admin();
+ensure_audit_columns($pdo);
 $page_title = 'Reservas';
 
 $acto_id = (int) ($_GET['acto_id'] ?? 0);
@@ -11,8 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) ($_POST['id'] ?? 0);
 
     if (($_POST['action'] ?? '') === 'estado') {
-        $pdo->prepare("UPDATE reservas SET estado=:estado, updated_at=NOW() WHERE id=:id")
-            ->execute(['estado' => $_POST['estado'], 'id' => $id]);
+        $pdo->prepare("UPDATE reservas SET estado=:estado, updated_at=NOW(), updated_by=:updated_by WHERE id=:id")
+            ->execute(['estado' => $_POST['estado'], 'id' => $id, 'updated_by' => current_user_id()]);
         log_activity($pdo, 'update', 'reservas', 'Estado de reserva actualizado');
     }
 
@@ -32,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $yaEstabaPagada = (int) ($actual['pagada'] ?? 0) === 1;
             $token = !empty($actual['qr_token']) ? $actual['qr_token'] : bin2hex(random_bytes(32));
 
-            $pdo->prepare("UPDATE reservas SET pagada=1, fecha_pago=COALESCE(fecha_pago, NOW()), qr_token=:token, updated_at=NOW() WHERE id=:id")
-                ->execute(['token' => $token, 'id' => $id]);
+            $pdo->prepare("UPDATE reservas SET pagada=1, fecha_pago=COALESCE(fecha_pago, NOW()), qr_token=:token, updated_at=NOW(), updated_by=:updated_by WHERE id=:id")
+                ->execute(['token' => $token, 'id' => $id, 'updated_by' => current_user_id()]);
             log_activity($pdo, 'pago', 'reservas', 'Reserva marcada como pagada');
 
             // Avisamos solo al usuario propietario de la reserva cuando el pago pasa de no pagado a pagado.
@@ -51,8 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (($_POST['action'] ?? '') === 'no_pago') {
-        $pdo->prepare("UPDATE reservas SET pagada=0, fecha_pago=NULL, qr_token=NULL, qr_usado=0, fecha_qr_usado=NULL, validado_por=NULL, updated_at=NOW() WHERE id=:id")
-            ->execute(['id' => $id]);
+        $pdo->prepare("UPDATE reservas SET pagada=0, fecha_pago=NULL, qr_token=NULL, qr_usado=0, fecha_qr_usado=NULL, validado_por=NULL, updated_at=NOW(), updated_by=:updated_by WHERE id=:id")
+            ->execute(['id' => $id, 'updated_by' => current_user_id()]);
         log_activity($pdo, 'pago', 'reservas', 'Reserva marcada como no pagada');
     }
 

@@ -1,14 +1,21 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_admin();
+ensure_audit_columns($pdo);
 $page_title = 'Avisos';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
 
     if (($_POST['action'] ?? '') === 'delete') {
-        $pdo->prepare("DELETE FROM avisos WHERE id=:id")->execute(['id' => (int) $_POST['id']]);
-        log_activity($pdo, 'delete', 'avisos', 'Aviso eliminado');
+        $idDelete = (int) $_POST['id'];
+        $stmt = $pdo->prepare("SELECT titulo FROM avisos WHERE id=:id");
+        $stmt->execute(['id' => $idDelete]);
+        $avisoDelete = $stmt->fetch();
+        $avisoTituloDelete = $avisoDelete['titulo'] ?? ('ID ' . $idDelete);
+
+        $pdo->prepare("DELETE FROM avisos WHERE id=:id")->execute(['id' => $idDelete]);
+        log_activity($pdo, 'Eliminado', 'avisos', 'Aviso eliminado: ' . $avisoTituloDelete, $idDelete, $avisoTituloDelete);
         redirect('avisos.php');
     }
 
@@ -25,17 +32,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($id) {
         $data['id'] = $id;
+        $data['updated_by'] = current_user_id();
         $pdo->prepare("
             UPDATE avisos 
             SET titulo=:titulo, 
                 texto=:texto, 
                 prioridad=:prioridad, 
                 destacado=:destacado, 
-                updated_at=NOW() 
+                updated_at=NOW(),
+                updated_by=:updated_by
             WHERE id=:id
         ")->execute($data);
     } else {
-        $data['created_by'] = $_SESSION['user_id'];
+        $data['created_by'] = current_user_id();
         $pdo->prepare("
             INSERT INTO avisos 
             (titulo, texto, prioridad, destacado, created_by) 
@@ -44,7 +53,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ")->execute($data);
     }
 
-    log_activity($pdo, 'save', 'avisos', 'Aviso guardado');
+    $avisoId = $id ?: (int) $pdo->lastInsertId();
+    log_activity(
+        $pdo,
+        $esNuevoAviso ? 'Creado' : 'Modificado',
+        'avisos',
+        ($esNuevoAviso ? 'Aviso creado: ' : 'Aviso modificado: ') . $data['titulo'],
+        $avisoId,
+        $data['titulo']
+    );
 
     if ($esNuevoAviso) {
         require_once __DIR__ . '/enviar-notificacion.php';
@@ -66,7 +83,17 @@ if (!empty($_GET['edit'])) {
     $edit = $stmt->fetch();
 }
 
-$avisos = $pdo->query("SELECT * FROM avisos ORDER BY created_at DESC")->fetchAll();
+$avisos = $pdo->query("
+    SELECT a.*,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cu_f.nombre, cu_f.apellidos)), ''), cu.dni, 'Sistema') AS creado_por_nombre,
+           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', uu_f.nombre, uu_f.apellidos)), ''), uu.dni, 'Sin editar') AS editado_por_nombre
+    FROM avisos a
+    LEFT JOIN users cu ON cu.id = a.created_by
+    LEFT JOIN falleros cu_f ON cu_f.id = cu.fallero_id
+    LEFT JOIN users uu ON uu.id = a.updated_by
+    LEFT JOIN falleros uu_f ON uu_f.id = uu.fallero_id
+    ORDER BY a.created_at DESC
+")->fetchAll();
 
 include __DIR__ . '/header.php';
 include __DIR__ . '/sidebar.php';
@@ -117,7 +144,6 @@ include __DIR__ . '/sidebar.php';
                     <div class="d-flex gap-2 justify-content-between">
                         <div>
                             <h3 class="h6 mb-1"><?= e($aviso['titulo']) ?></h3>
-                            <small class="text-muted"><?= e(date('d/m/Y H:i', strtotime($aviso['created_at']))) ?></small>
                         </div>
 
                         <div>

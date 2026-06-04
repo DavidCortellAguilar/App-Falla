@@ -2,7 +2,6 @@
 require_once __DIR__ . '/../config.php';
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: https://taronvibe.davidcortellaguilar.es');
 header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type');
 
@@ -27,7 +26,7 @@ try {
     $stmt->execute();
     $actos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $baseUrl = 'https://fssaf.davidcortellaguilar.es/';
+    $baseUrl = 'https://app.fssaf.es/';
 
     $data = array_map(function ($acto) use ($baseUrl) {
         $imagen = $acto['imagen'] ?? '';

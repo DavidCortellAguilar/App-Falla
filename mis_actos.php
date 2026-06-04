@@ -201,13 +201,33 @@ include __DIR__ . '/sidebar.php';
                         <p><?= e($acto['descripcion']) ?></p>
                         <?php if (!$actoAbierto): ?><div class="alert alert-danger small">Acto cerrado: no se pueden crear ni modificar reservas.</div><?php endif; ?>
 
-                        <?php if ($esRepresentante): ?>
-                            <div class="alert alert-light border small">Selecciona cada miembro de la familia y su opción correspondiente.</div>
+                        <?php
+                        $mostrarFamiliares = false;
+                        if ($esRepresentante) {
+                            foreach ($miembrosPermitidos as $miembroCheck) {
+                                if ((int)$miembroCheck['id'] === $falleroIdSesion) continue;
+                                if (!empty($reservasActuales[(int)$acto['id']][(int)$miembroCheck['id']])) {
+                                    $mostrarFamiliares = true;
+                                    break;
+                                }
+                            }
+                        }
+                        ?>
+
+                        <?php if ($esRepresentante && count($miembrosPermitidos) > 1): ?>
+                            <div class="family-toggle-box">
+                                <label class="family-toggle-label">
+                                    <input class="form-check-input js-familiares-check" type="checkbox" <?= $mostrarFamiliares ? 'checked' : '' ?>>
+                                    <i class="fas fa-users"></i>
+                                    <span>¿Quieres apuntar algún familiar?</span>
+                                </label>
+                            </div>
                         <?php endif; ?>
 
                         <div class="family-reserve-list">
                             <?php foreach ($miembrosPermitidos as $miembro): ?>
                                 <?php
+                                $esMiReserva = (int)$miembro['id'] === $falleroIdSesion;
                                 $reserva = $reservasActuales[(int)$acto['id']][(int)$miembro['id']] ?? null;
                                 $invitadosActuales = $reserva ? ($invitadosPorReserva[(int)$reserva['id']] ?? []) : [];
                                 if (!$invitadosActuales && $reserva && !empty($reserva['invitado_nombre'])) {
@@ -218,7 +238,7 @@ include __DIR__ . '/sidebar.php';
                                     ];
                                 }
                                 ?>
-                                <form method="post" class="family-reserve-row">
+                                <form method="post" class="family-reserve-row <?= (!$esMiReserva && $esRepresentante) ? 'js-familiar-row' : 'js-self-row' ?>" style="<?= (!$esMiReserva && $esRepresentante && !$mostrarFamiliares) ? 'display:none;' : '' ?>">
                                     <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                                     <input type="hidden" name="acto_id" value="<?= (int) $acto['id'] ?>">
                                     <input type="hidden" name="fallero_id" value="<?= (int) $miembro['id'] ?>">
@@ -325,6 +345,15 @@ include __DIR__ . '/sidebar.php';
 </style>
 <script>
 document.addEventListener('change', function(e){
+    if (e.target.classList.contains('js-familiares-check')) {
+        const card = e.target.closest('.user-act-card');
+        if (!card) return;
+        card.querySelectorAll('.js-familiar-row').forEach(function(row){
+            row.style.display = e.target.checked ? '' : 'none';
+        });
+        return;
+    }
+
     if (!e.target.classList.contains('js-invitado-check')) return;
     const section = e.target.closest('.guest-section');
     const fields = section ? section.querySelector('.js-invitado-fields') : null;

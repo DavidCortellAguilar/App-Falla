@@ -64,6 +64,12 @@ function menu_active(string $page, string $currentPage): string
             <a href="escanear_qr.php" class="menu-link<?= menu_active('escanear_qr.php', $currentPage) ?>">
                 <span>📷</span><span>Escanear QR</span>
             </a>
+
+            <div class="menu-section">Control</div>
+
+            <a href="auditoria.php" class="menu-link<?= menu_active('auditoria.php', $currentPage) ?>">
+                <span>🧾</span><span>Auditoría</span>
+            </a>
         <?php else: ?>
             <div class="menu-section">Mi zona</div>
 

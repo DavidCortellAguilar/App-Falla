@@ -14,6 +14,7 @@ function ensure_juntas_tables(PDO $pdo): void
         created_by INT(11) DEFAULT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT NULL,
+        updated_by INT(11) DEFAULT NULL,
         PRIMARY KEY (id),
         KEY idx_fecha (fecha)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
@@ -25,9 +26,13 @@ function ensure_juntas_tables(PDO $pdo): void
         ruta VARCHAR(500) NOT NULL,
         created_by INT(11) DEFAULT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        deleted_by INT(11) DEFAULT NULL,
         PRIMARY KEY (id),
         KEY idx_junta_id (junta_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    try { $pdo->exec("ALTER TABLE juntas ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE junta_archivos ADD COLUMN IF NOT EXISTS deleted_by INT(11) DEFAULT NULL AFTER created_at"); } catch (Throwable $e) {}
 }
 
 function subir_archivo_junta(): ?string

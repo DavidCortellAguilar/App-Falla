@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ruta = __DIR__ . '/' . $arch['ruta'];
             if (is_file($ruta)) unlink($ruta);
             $pdo->prepare("DELETE FROM junta_archivos WHERE id = :id")->execute(['id' => $archId]);
+            log_activity($pdo, 'delete', 'junta_archivos', 'Archivo de junta eliminado ID ' . $archId);
+            log_activity($pdo, 'create', 'junta_archivos', 'Archivo añadido a junta ID ' . $jIdPost);
         }
 
         redirect('junta_detalle.php?id=' . $jIdPost);
@@ -42,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'junta_id'        => $jIdPost,
                 'nombre_original' => $_FILES['archivo']['name'],
                 'ruta'            => $rutaArchivo,
-                'created_by'      => $_SESSION['user_id'],
+                'created_by'      => current_user_id(),
             ]);
         }
 

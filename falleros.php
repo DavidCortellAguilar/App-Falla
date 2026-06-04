@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_admin();
+ensure_audit_columns($pdo);
 $page_title = 'Falleros';
 
 $error = '';
@@ -11,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (($_POST['action'] ?? '') === 'delete') {
         $stmt = $pdo->prepare("DELETE FROM falleros WHERE id = :id");
         $stmt->execute(['id' => (int) $_POST['id']]);
-        log_activity($pdo, 'delete', 'falleros', 'Fallero eliminado');
+        log_activity($pdo, 'delete', 'falleros', 'Fallero eliminado ID ' . (int) $_POST['id']);
         redirect('falleros.php');
     }
 
@@ -63,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $data['id'] = $id;
+            $data['updated_by'] = current_user_id();
 
             $stmt = $pdo->prepare("
                 UPDATE falleros
@@ -77,7 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     sexo=:sexo,
                     estado=:estado,
                     familia_id=:familia_id,
-                    updated_at=NOW()
+                    updated_at=NOW(),
+                    updated_by=:updated_by
                 WHERE id=:id
             ");
             $stmt->execute($data);
@@ -106,9 +109,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $stmt = $pdo->prepare("
-                INSERT INTO falleros (nombre, apellidos, dni, fecha_nacimiento, telefono, email, direccion, tipo, sexo, estado, familia_id)
-                VALUES (:nombre, :apellidos, :dni, :fecha_nacimiento, :telefono, :email, :direccion, :tipo, :sexo, :estado, :familia_id)
+                INSERT INTO falleros (nombre, apellidos, dni, fecha_nacimiento, telefono, email, direccion, tipo, sexo, estado, familia_id, created_by)
+                VALUES (:nombre, :apellidos, :dni, :fecha_nacimiento, :telefono, :email, :direccion, :tipo, :sexo, :estado, :familia_id, :created_by)
             ");
+            $data['created_by'] = current_user_id();
             $stmt->execute($data);
 
             log_activity($pdo, 'create', 'falleros', 'Fallero creado');
@@ -134,7 +138,15 @@ if (!empty($_GET['edit'])) {
 
 $q = trim($_GET['q'] ?? '');
 $estadoFiltro = trim($_GET['estado'] ?? '');
-$sql = "SELECT f.*, fa.nombre AS familia FROM falleros f LEFT JOIN familias fa ON fa.id=f.familia_id";
+$sql = "SELECT f.*, fa.nombre AS familia,
+       COALESCE(NULLIF(TRIM(CONCAT_WS(' ', cu_f.nombre, cu_f.apellidos)), ''), cu.dni, 'Sistema') AS creado_por_nombre,
+       COALESCE(NULLIF(TRIM(CONCAT_WS(' ', uu_f.nombre, uu_f.apellidos)), ''), uu.dni, 'Sin editar') AS editado_por_nombre
+FROM falleros f
+LEFT JOIN familias fa ON fa.id=f.familia_id
+LEFT JOIN users cu ON cu.id = f.created_by
+LEFT JOIN falleros cu_f ON cu_f.id = cu.fallero_id
+LEFT JOIN users uu ON uu.id = f.updated_by
+LEFT JOIN falleros uu_f ON uu_f.id = uu.fallero_id";
 $where = [];
 $params = [];
 
@@ -255,7 +267,7 @@ include __DIR__ . '/sidebar.php';
 
             <div class="table-card">
                 <table class="table align-middle">
-                    <thead><tr><th>Fallero</th><th>DNI</th><th>Tipo</th><th>Estado</th><th>Familia</th><th></th></tr></thead>
+                    <thead><tr><th>Fallero</th><th>DNI</th><th>Tipo</th><th>Estado</th><th>Familia</th><th>Auditoría</th><th></th></tr></thead>
                     <tbody>
                     <?php foreach ($falleros as $fallero): ?>
                         <tr>
