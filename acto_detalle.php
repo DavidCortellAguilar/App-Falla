@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/comidas_helpers.php';
+ensure_comidas_multiples_schema($pdo);
 require_login();
 
 $actoId = (int) ($_GET['id'] ?? 0);
@@ -41,24 +43,34 @@ $totalPendientes = (int) $stmt->fetchColumn();
 
 $stmt = $pdo->prepare("
     SELECT oc.id,
+           oc.categoria,
            oc.nombre,
            oc.descripcion,
            oc.max_plazas,
            oc.is_active,
            (
-               SELECT COUNT(*) FROM reservas r
-               WHERE r.opcion_comida_id = oc.id AND r.estado='confirmada'
+               SELECT COUNT(*) FROM reserva_opciones ro INNER JOIN reservas r ON r.id = ro.reserva_id
+               WHERE ro.opcion_comida_id = oc.id AND r.estado='confirmada'
            ) + (
-               SELECT COUNT(*) FROM reserva_invitados ri
+               SELECT COUNT(*) FROM reserva_invitado_opciones rio INNER JOIN reserva_invitados ri ON ri.id = rio.reserva_invitado_id
                INNER JOIN reservas r2 ON r2.id = ri.reserva_id
-               WHERE ri.opcion_comida_id = oc.id AND r2.estado='confirmada'
+               WHERE rio.opcion_comida_id = oc.id AND r2.estado='confirmada'
            ) AS total_confirmadas
     FROM opciones_comida oc
     WHERE oc.acto_id = :acto_id
-    ORDER BY oc.id ASC
+    ORDER BY oc.categoria ASC, oc.id ASC
 ");
 $stmt->execute(['acto_id' => $actoId]);
 $opciones = $stmt->fetchAll();
+
+$opcionesPorBloque = [];
+foreach ($opciones as $opcionResumen) {
+    $bloque = trim((string)($opcionResumen['categoria'] ?? '')) ?: 'Comida';
+    if (!isset($opcionesPorBloque[$bloque])) {
+        $opcionesPorBloque[$bloque] = [];
+    }
+    $opcionesPorBloque[$bloque][] = $opcionResumen;
+}
 
 $stmt = $pdo->prepare("
     SELECT r.*,
@@ -86,13 +98,31 @@ if ($reservaIds) {
     }
 }
 
+$opcionesTextoPorReserva = [];
+$opcionesTextoPorInvitado = [];
+if ($reservaIds) {
+    $ph = implode(',', array_fill(0, count($reservaIds), '?'));
+    $stmtRO = $pdo->prepare("SELECT ro.reserva_id, ro.categoria, oc.nombre FROM reserva_opciones ro INNER JOIN opciones_comida oc ON oc.id=ro.opcion_comida_id WHERE ro.reserva_id IN ($ph) ORDER BY ro.categoria, oc.id");
+    $stmtRO->execute($reservaIds);
+    foreach ($stmtRO->fetchAll() as $ro) $opcionesTextoPorReserva[(int)$ro['reserva_id']][] = $ro['categoria'] . ': ' . $ro['nombre'];
+
+    $invIds = [];
+    foreach ($invitadosPorReserva as $lista) foreach ($lista as $invTmp) $invIds[] = (int)$invTmp['id'];
+    if ($invIds) {
+        $iph = implode(',', array_fill(0, count($invIds), '?'));
+        $stmtIO = $pdo->prepare("SELECT rio.reserva_invitado_id, rio.categoria, oc.nombre FROM reserva_invitado_opciones rio INNER JOIN opciones_comida oc ON oc.id=rio.opcion_comida_id WHERE rio.reserva_invitado_id IN ($iph) ORDER BY rio.categoria, oc.id");
+        $stmtIO->execute($invIds);
+        foreach ($stmtIO->fetchAll() as $io) $opcionesTextoPorInvitado[(int)$io['reserva_invitado_id']][] = $io['categoria'] . ': ' . $io['nombre'];
+    }
+}
+
 $lineasReserva = [];
 foreach ($reservas as $reserva) {
     $lineasReserva[] = [
         'tipo' => 'fallero',
         'persona' => trim($reserva['nombre'] . ' ' . $reserva['apellidos']),
         'dni' => $reserva['dni'],
-        'opcion' => $reserva['opcion'] ?: 'Sin opción',
+        'opcion' => !empty($opcionesTextoPorReserva[(int)$reserva['id']]) ? implode(' · ', $opcionesTextoPorReserva[(int)$reserva['id']]) : ($reserva['opcion'] ?: 'Sin opción'),
         'invitado_de' => '-',
         'estado' => $reserva['estado'],
         'fecha_reserva' => $reserva['fecha_reserva'],
@@ -102,7 +132,7 @@ foreach ($reservas as $reserva) {
             'tipo' => 'invitado',
             'persona' => trim(($inv['nombre'] ?? '') . (!empty($inv['tipo']) ? ' · ' . $inv['tipo'] : '')),
             'dni' => '',
-            'opcion' => $inv['opcion_nombre'] ?: 'Sin opción',
+            'opcion' => !empty($opcionesTextoPorInvitado[(int)$inv['id']]) ? implode(' · ', $opcionesTextoPorInvitado[(int)$inv['id']]) : ($inv['opcion_nombre'] ?: 'Sin opción'),
             'invitado_de' => trim($reserva['nombre'] . ' ' . $reserva['apellidos']),
             'estado' => $reserva['estado'],
             'fecha_reserva' => $reserva['fecha_reserva'],
@@ -159,44 +189,53 @@ include __DIR__ . '/sidebar.php';
         <div class="row g-4">
             <div class="col-xl-5">
                 <div class="card-modern mb-4">
-                    <h2 class="h5 mb-3">Recuento por opciones</h2>
+                    <h2 class="h5 mb-3">Recuento por bloques</h2>
 
-                    <?php if (!$opciones): ?>
+                    <?php if (!$opcionesPorBloque): ?>
                         <p class="text-muted mb-0">Este acto todavía no tiene opciones internas configuradas.</p>
                     <?php endif; ?>
 
-                    <div class="option-summary-list">
-                        <?php foreach ($opciones as $opcion): ?>
-                            <?php
-                            $max = $opcion['max_plazas'] !== null ? (int) $opcion['max_plazas'] : null;
-                            $total = (int) $opcion['total_confirmadas'];
-                            $percent = $max && $max > 0 ? min(100, round(($total / $max) * 100)) : 0;
-                            ?>
-                            <div class="option-summary-item">
-                                <div class="d-flex justify-content-between gap-3">
-                                    <div>
-                                        <strong><?= e($opcion['nombre']) ?></strong>
-                                        <?php if (!(int) $opcion['is_active']): ?>
-                                            <span class="badge bg-secondary ms-1">inactiva</span>
-                                        <?php endif; ?>
-                                        <?php if ($opcion['descripcion']): ?>
-                                            <div class="text-muted small"><?= e($opcion['descripcion']) ?></div>
-                                        <?php endif; ?>
+                    <?php if ($opcionesPorBloque): ?>
+                        <div class="acto-bloques-resumen">
+                            <?php foreach ($opcionesPorBloque as $bloque => $opcionesBloque): ?>
+                                <section class="reservas-bloque-card acto-bloque-card">
+                                    <div class="reservas-bloque-head">
+                                        <div class="stat-icon">🍽️</div>
+                                        <h2><?= e($bloque) ?></h2>
                                     </div>
-                                    <div class="option-count"><?= $total ?></div>
-                                </div>
-
-                                <?php if ($max): ?>
-                                    <div class="progress mt-2" style="height: 8px;">
-                                        <div class="progress-bar" style="width: <?= $percent ?>%"></div>
+                                    <div class="reservas-bloque-opciones">
+                                        <?php foreach ($opcionesBloque as $opcion): ?>
+                                            <?php
+                                            $max = $opcion['max_plazas'] !== null ? (int) $opcion['max_plazas'] : null;
+                                            $total = (int) $opcion['total_confirmadas'];
+                                            $percent = $max && $max > 0 ? min(100, round(($total / $max) * 100)) : 0;
+                                            ?>
+                                            <div class="reservas-bloque-opcion acto-bloque-opcion">
+                                                <div>
+                                                    <span><?= e($opcion['nombre']) ?></span>
+                                                    <?php if (!(int) $opcion['is_active']): ?>
+                                                        <span class="badge bg-secondary ms-1">inactiva</span>
+                                                    <?php endif; ?>
+                                                    <?php if ($opcion['descripcion']): ?>
+                                                        <div class="text-muted small mt-1"><?= e($opcion['descripcion']) ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if ($max): ?>
+                                                        <div class="progress mt-2" style="height: 8px;">
+                                                            <div class="progress-bar" style="width: <?= $percent ?>%"></div>
+                                                        </div>
+                                                        <div class="text-muted small mt-1"><?= $total ?> de <?= $max ?> plazas</div>
+                                                    <?php else: ?>
+                                                        <div class="text-muted small mt-1">Sin límite de plazas específico</div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <strong><?= $total ?></strong>
+                                            </div>
+                                        <?php endforeach; ?>
                                     </div>
-                                    <div class="text-muted small mt-1"><?= $total ?> de <?= $max ?> plazas</div>
-                                <?php else: ?>
-                                    <div class="text-muted small mt-1">Sin límite de plazas específico</div>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
+                                </section>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="card-modern">

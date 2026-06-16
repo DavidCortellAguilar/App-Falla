@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_admin();
-ensure_audit_columns($pdo);
+require_login();
+if (is_admin()) {
+    ensure_audit_columns($pdo);
+}
 
 $page_title = 'Juntas';
 
@@ -10,6 +12,11 @@ ensure_juntas_tables($pdo);
 
 // ── POST ─────────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!is_admin()) {
+        http_response_code(403);
+        exit('Acceso no autorizado.');
+    }
+
     check_csrf();
 
     // Eliminar junta completa
@@ -99,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── GET: formulario de edición ───────────────────────────────────────────────
 $edit = null;
-if (!empty($_GET['edit'])) {
+if (is_admin() && !empty($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT * FROM juntas WHERE id = :id");
     $stmt->execute(['id' => (int) $_GET['edit']]);
     $edit = $stmt->fetch();
@@ -144,6 +151,7 @@ include __DIR__ . '/sidebar.php';
     <section class="dashboard-content">
         <div class="row g-4">
 
+            <?php if (is_admin()): ?>
             <!-- Formulario -->
             <div class="col-xl-4">
                 <div class="card-modern sticky-form">
@@ -190,8 +198,10 @@ include __DIR__ . '/sidebar.php';
                 </div>
             </div>
 
+            <?php endif; ?>
+
             <!-- Listado -->
-            <div class="col-xl-8">
+            <div class="<?= is_admin() ? 'col-xl-8' : 'col-12' ?>">
                 <h2 class="section-title mb-3">Juntas registradas</h2>
 
                 <div class="actos-grid">
@@ -218,6 +228,7 @@ include __DIR__ . '/sidebar.php';
                                     <div class="acto-card-link">Ver documentos →</div>
                             </a>
 
+                            <?php if (is_admin()): ?>
                             <div class="acto-card-actions">
                                 <a class="btn btn-sm btn-light"
                                    href="juntas.php?edit=<?= (int) $junta['id'] ?>">Editar</a>
@@ -230,12 +241,13 @@ include __DIR__ . '/sidebar.php';
                                     <button class="btn btn-sm btn-outline-danger">Eliminar</button>
                                 </form>
                             </div>
+                            <?php endif; ?>
                         </article>
                     <?php endforeach; ?>
 
                     <?php if (!$juntas): ?>
                         <div class="card-modern text-center text-muted py-5" style="grid-column:1/-1;">
-                            Todavía no hay juntas registradas. Crea la primera con el formulario.
+                            Todavía no hay juntas registradas.
                         </div>
                     <?php endif; ?>
                 </div>

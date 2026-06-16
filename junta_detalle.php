@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_admin();
+require_login();
 
 $juntaId = (int) ($_GET['id'] ?? 0);
 
@@ -9,6 +9,11 @@ ensure_juntas_tables($pdo);
 
 // ── POST: acciones de esta página ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!is_admin()) {
+        http_response_code(403);
+        exit('Acceso no autorizado.');
+    }
+
     check_csrf();
 
     // Eliminar un archivo concreto
@@ -114,7 +119,9 @@ include __DIR__ . '/sidebar.php';
         </div>
         <div class="topbar-actions">
             <a href="juntas.php" class="topbar-btn">← Juntas</a>
-            <a href="juntas.php?edit=<?= (int) $junta['id'] ?>" class="topbar-btn">Editar</a>
+            <?php if (is_admin()): ?>
+                <a href="juntas.php?edit=<?= (int) $junta['id'] ?>" class="topbar-btn">Editar</a>
+            <?php endif; ?>
         </div>
     </header>
 
@@ -158,6 +165,7 @@ include __DIR__ . '/sidebar.php';
                         </div>
                     </div>
 
+                    <?php if (is_admin()): ?>
                     <hr class="my-4">
                     <h3 class="h6 mb-3">Añadir documento</h3>
 
@@ -175,6 +183,7 @@ include __DIR__ . '/sidebar.php';
 
                         <button class="btn btn-primary w-100">Subir documento</button>
                     </form>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -185,7 +194,7 @@ include __DIR__ . '/sidebar.php';
                 <?php if (!$archivos): ?>
                     <div class="card-modern text-muted text-center py-5">
                         Todavía no hay documentos en esta junta.<br>
-                        Usa el formulario de la izquierda para subir el primero.
+Cuando el administrador suba documentos, aparecerán aquí para poder verlos y descargarlos.
                     </div>
                 <?php endif; ?>
 
@@ -252,6 +261,7 @@ include __DIR__ . '/sidebar.php';
                                     <button class="btn btn-secondary btn-sm" type="button" disabled>Archivo no disponible</button>
                                 <?php endif; ?>
 
+                                <?php if (is_admin()): ?>
                                 <form method="post"
                                       action="junta_detalle.php?id=<?= (int) $junta['id'] ?>"
                                       onsubmit="return confirm('¿Eliminar este documento?')">
@@ -261,6 +271,7 @@ include __DIR__ . '/sidebar.php';
                                     <input type="hidden" name="junta_id" value="<?= (int) $junta['id'] ?>">
                                     <button class="btn btn-outline-danger btn-sm">✕</button>
                                 </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>

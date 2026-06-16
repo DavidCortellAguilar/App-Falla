@@ -547,7 +547,36 @@ a { text-decoration: none; }
     color: #dc2626;
 }
 
-.options-rows {
+.options-rows,
+.food-blocks {
+    display: grid;
+    gap: 14px;
+}
+
+.food-block {
+    border: 2px solid rgba(19, 120, 255, .18);
+    background: rgba(19, 120, 255, .05);
+    border-radius: 18px;
+    padding: 16px;
+}
+
+.food-block-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+
+.food-block-title-wrap {
+    flex: 1;
+}
+
+.food-block-title {
+    font-weight: 800;
+}
+
+.food-block-options {
     display: grid;
     gap: 10px;
 }
@@ -557,6 +586,10 @@ a { text-decoration: none; }
     grid-template-columns: 1.2fr .7fr 1.4fr auto;
     gap: 8px;
     align-items: center;
+    padding: 10px;
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .88);
 }
 
 .option-summary-list {
@@ -639,6 +672,11 @@ a { text-decoration: none; }
 @media (max-width: 991px) {
     .sticky-form {
         position: static;
+    }
+
+    .food-block-header {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .option-row {
@@ -1790,4 +1828,839 @@ a { text-decoration: none; }
 .family-toggle-label i {
     color: #0d6efd;
     font-size: 1.2rem;
+}
+/* Fix iPhone/Safari: estilo del bloque de familiares con mayor prioridad */
+body .family-toggle-box,
+body .main-dashboard .dashboard-content .family-toggle-box{
+    display: block !important;
+    width: 100% !important;
+    background-color: rgba(13, 110, 253, 0.08) !important;
+    border: 2px solid rgba(13, 110, 253, 0.45) !important;
+    border-radius: 18px !important;
+    padding: 18px 20px !important;
+    margin: 18px 0 22px !important;
+    box-shadow: 0 10px 25px rgba(13, 110, 253, 0.08) !important;
+    -webkit-box-sizing: border-box !important;
+    box-sizing: border-box !important;
+}
+
+body .family-toggle-label,
+body .main-dashboard .dashboard-content .family-toggle-label{
+    display: -webkit-box !important;
+    display: -webkit-flex !important;
+    display: flex !important;
+    -webkit-box-align: center !important;
+    -webkit-align-items: center !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin: 0 !important;
+    color: #0d47a1 !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    cursor: pointer !important;
+}
+
+body .family-toggle-label input[type="checkbox"]{
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    accent-color: #0d6efd !important;
+}
+
+body .family-toggle-label i{
+    color: #0d6efd !important;
+}
+
+/* Reservas admin: botones y estados más limpios */
+.admin-reservas-card{
+    overflow: visible;
+}
+
+.admin-reservas-table{
+    min-width: 980px;
+}
+
+.admin-reservas-table thead th{
+    font-weight: 900;
+    color: #101828;
+    border-bottom: 1px solid #e4e7ec;
+    padding: 16px 10px;
+}
+
+.admin-reservas-table tbody td{
+    padding: 18px 10px;
+    vertical-align: middle;
+    border-bottom: 1px solid #eef1f5;
+}
+
+.admin-actions-cell{
+    min-width: 230px;
+}
+
+.admin-reserva-actions{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.admin-action-form{
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 0;
+}
+
+.admin-status-form{
+    background: rgba(13, 110, 253, 0.06);
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    border-radius: 18px;
+    padding: 8px;
+    box-shadow: 0 8px 20px rgba(16, 24, 40, 0.04);
+}
+
+.admin-status-select{
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    border-radius: 14px;
+    min-width: 128px;
+    padding: 10px 36px 10px 14px;
+    font-weight: 800;
+    cursor: pointer;
+    outline: none;
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 14px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%23344954' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.admin-status-select.status-confirmada,
+.admin-pill.status-confirmada,
+.admin-pill.status-pagada,
+.admin-pill.status-disponible{
+    background: #dcfae6;
+    color: #067647;
+}
+
+.admin-status-select.status-cancelada,
+.admin-pill.status-cancelada,
+.admin-pill.status-usado{
+    background: #fee4e2;
+    color: #b42318;
+}
+
+.admin-status-select.status-pendiente,
+.admin-pill.status-pendiente{
+    background: #fef0c7;
+    color: #b54708;
+}
+
+.admin-pill.status-no-pagada{
+    background: #eef2f6;
+    color: #475467;
+}
+
+.admin-pill{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 0.84rem;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.admin-pill-info{
+    margin-top: 7px;
+    background: #e0f2fe;
+    color: #026aa2;
+}
+
+.admin-pill-muted{
+    background: #f2f4f7;
+    color: #667085;
+}
+
+.admin-btn{
+    border: 0;
+    border-radius: 14px;
+    padding: 10px 15px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    white-space: nowrap;
+}
+
+.admin-btn:hover{
+    transform: translateY(-1px);
+}
+
+.admin-btn-save{
+    background: #ffffff;
+    color: #344054;
+    border: 1px solid #d0d5dd;
+    box-shadow: 0 3px 10px rgba(16, 24, 40, 0.06);
+}
+
+.admin-btn-pay{
+    background: #12b76a;
+    color: #ffffff;
+    box-shadow: 0 8px 20px rgba(18, 183, 106, 0.22);
+}
+
+.admin-btn-unpay{
+    background: #fff1f3;
+    color: #c01048;
+    border: 1px solid #fecdd6;
+}
+
+@media (max-width: 767px){
+    .admin-reserva-actions,
+    .admin-action-form{
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .admin-action-form{
+        flex-direction: column;
+    }
+
+    .admin-status-select,
+    .admin-btn{
+        width: 100%;
+    }
+}
+
+/* Selección y pago en bloque de reservas */
+.admin-bulk-pay-form{
+    margin: 0 0 16px 0;
+}
+
+.admin-bulk-toolbar{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 18px;
+    background: rgba(13, 110, 253, 0.06);
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    box-shadow: 0 10px 26px rgba(16, 24, 40, 0.05);
+}
+
+.admin-check-label{
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-weight: 900;
+    color: #101828;
+    cursor: pointer;
+}
+
+.admin-check-all{
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid #d0d5dd;
+}
+
+.admin-check-column{
+    width: 64px;
+    text-align: center;
+}
+
+.admin-reserva-check{
+    width: 20px;
+    height: 20px;
+    accent-color: #0d6efd;
+    cursor: pointer;
+}
+
+.admin-check-card{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    margin: 0;
+    border-radius: 15px;
+    background: rgba(13, 110, 253, 0.07);
+    border: 1px solid rgba(13, 110, 253, 0.2);
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.admin-check-card:hover{
+    transform: translateY(-1px);
+    border-color: rgba(13, 110, 253, 0.45);
+    box-shadow: 0 8px 18px rgba(13, 110, 253, 0.12);
+}
+
+.admin-bulk-pay-btn{
+    padding: 13px 18px;
+    border-radius: 16px;
+}
+
+@media (max-width: 767px){
+    .admin-bulk-toolbar{
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-check-all,
+    .admin-bulk-pay-btn{
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Todas las reservas: vista móvil sin scroll horizontal */
+@media (max-width: 767px){
+    .admin-reservas-card{
+        padding: 12px !important;
+    }
+
+    .admin-reservas-card .table-responsive{
+        overflow: visible;
+    }
+
+    .admin-reservas-table{
+        min-width: 0 !important;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 12px;
+    }
+
+    .admin-reservas-table thead{
+        display: none;
+    }
+
+    .admin-reservas-table,
+    .admin-reservas-table tbody,
+    .admin-reservas-table tr,
+    .admin-reservas-table td{
+        display: block;
+        width: 100%;
+    }
+
+    .admin-reservas-table tbody tr{
+        background: #ffffff;
+        border: 1px solid #e4e7ec;
+        border-radius: 20px;
+        padding: 12px;
+        box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
+    }
+
+    .admin-reservas-table tbody tr.table-light{
+        background: #f8fbff;
+    }
+
+    .admin-reservas-table tbody td{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px dashed #e4e7ec;
+        text-align: right !important;
+        font-size: .92rem;
+    }
+
+    .admin-reservas-table tbody td:last-child{
+        border-bottom: 0;
+    }
+
+    .admin-reservas-table tbody td::before{
+        content: attr(data-label);
+        flex: 0 0 96px;
+        text-align: left;
+        color: #667085;
+        font-size: .78rem;
+        font-weight: 900;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+    }
+
+    .admin-reservas-table tbody td[data-label="Persona"]{
+        align-items: flex-start;
+        text-align: left !important;
+        flex-direction: column;
+        gap: 4px;
+        padding-top: 2px;
+    }
+
+    .admin-reservas-table tbody td[data-label="Persona"]::before{
+        flex: none;
+    }
+
+    .admin-check-column{
+        width: 100%;
+        text-align: right;
+    }
+
+    .admin-check-card{
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+    }
+
+    .admin-reserva-check{
+        width: 18px;
+        height: 18px;
+    }
+
+    .admin-pill{
+        padding: 6px 9px;
+        font-size: .72rem;
+    }
+
+    .admin-actions-cell{
+        min-width: 0;
+        display: block !important;
+        text-align: left !important;
+    }
+
+    .admin-actions-cell::before{
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .admin-reserva-actions{
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .admin-action-form,
+    .admin-status-form{
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 6px;
+        border-radius: 14px;
+    }
+
+    .admin-action-form:not(.admin-status-form){
+        padding: 0;
+        background: transparent;
+    }
+
+    .admin-status-select,
+    .admin-btn{
+        width: auto;
+        min-height: 36px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        font-size: .82rem;
+    }
+
+    .admin-status-select{
+        width: 100%;
+        min-width: 0;
+        padding-right: 30px;
+        background-position: right 10px center;
+    }
+
+    .admin-action-form:not(.admin-status-form) .admin-btn{
+        width: 100%;
+        grid-column: 1 / -1;
+    }
+
+    .admin-bulk-toolbar{
+        padding: 12px;
+        gap: 10px;
+        border-radius: 18px;
+    }
+
+    .admin-check-all{
+        padding: 9px 11px;
+        border-radius: 14px;
+        font-size: .9rem;
+    }
+
+    .admin-bulk-pay-btn{
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-size: .86rem;
+        line-height: 1.25;
+    }
+}
+
+/* Buscador de falleros en Todas las reservas */
+.admin-reservas-filter-card{
+    overflow: visible;
+}
+
+.admin-reservas-filter-form .form-label{
+    font-weight: 800;
+    color: #344054;
+}
+
+.admin-reservas-search-input{
+    border-radius: 16px;
+    min-height: 46px;
+    border: 1px solid #d0d5dd;
+    box-shadow: 0 4px 12px rgba(16, 24, 40, 0.03);
+}
+
+.admin-reservas-search-input:focus{
+    border-color: rgba(13, 110, 253, 0.55);
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.10);
+}
+
+.admin-search-result-note{
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 13px;
+    border-radius: 999px;
+    background: rgba(13, 110, 253, 0.07);
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    color: #0d47a1;
+    font-weight: 700;
+    font-size: .9rem;
+}
+
+@media (max-width: 767px){
+    .admin-reservas-filter-form{
+        gap: 10px !important;
+    }
+
+    .admin-reservas-filter-form .col-auto,
+    .admin-reservas-filter-form .btn{
+        width: 100%;
+    }
+
+    .admin-reservas-search-input,
+    .admin-reservas-filter-form .form-select{
+        min-height: 44px;
+        border-radius: 14px;
+        font-size: .95rem;
+    }
+
+    .admin-search-result-note{
+        width: 100%;
+        border-radius: 14px;
+        justify-content: center;
+        text-align: center;
+    }
+}
+
+/* Reservas en tarjetas para administradores y usuarios */
+.admin-reservas-grid,
+.mis-reservas-grid{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    align-items: stretch;
+}
+
+.admin-reserva-card,
+.usuario-reserva-card{
+    background: #ffffff;
+    border: 1px solid #e4e7ec;
+    border-radius: 22px;
+    padding: 16px;
+    box-shadow: 0 12px 32px rgba(16, 24, 40, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+.admin-reserva-card-invitado{
+    background: #f8fbff;
+}
+
+.admin-reserva-card-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed #e4e7ec;
+}
+
+.admin-reserva-card-head h3{
+    margin: 4px 0 0;
+    color: #101828;
+    font-size: 1rem;
+    line-height: 1.3;
+    font-weight: 950;
+    word-break: break-word;
+}
+
+.admin-card-label,
+.reserva-card-row span{
+    color: #667085;
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.admin-card-check-wrap{
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.reserva-card-fields{
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.reserva-card-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px dashed #eef1f5;
+}
+
+.reserva-card-row:last-child{
+    border-bottom: 0;
+}
+
+.reserva-card-row strong{
+    color: #101828;
+    font-size: .9rem;
+    line-height: 1.35;
+    text-align: right;
+    font-weight: 800;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.reserva-card-row-block{
+    align-items: flex-start;
+}
+
+.reserva-card-row-block strong{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-card-actions,
+.usuario-card-actions{
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid #eef1f5;
+}
+
+.admin-card-actions .admin-status-form,
+.admin-card-actions .admin-pay-form{
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.admin-card-actions .admin-pay-form{
+    display: block;
+}
+
+.admin-card-actions .admin-pay-form .admin-btn,
+.usuario-card-actions .admin-btn,
+.usuario-card-actions form,
+.usuario-card-actions form .admin-btn{
+    width: 100%;
+}
+
+.admin-card-actions .admin-btn,
+.admin-card-actions .admin-status-select,
+.usuario-card-actions .admin-btn{
+    min-height: 38px;
+    padding: 9px 11px;
+    border-radius: 13px;
+    font-size: .85rem;
+}
+
+.admin-card-actions .admin-status-select{
+    width: 100%;
+    min-width: 0;
+}
+
+.usuario-reserva-persona{
+    margin: 6px 0 0;
+    color: #667085;
+    font-weight: 800;
+    font-size: .9rem;
+}
+
+.usuario-invitado-linea{
+    display: block;
+}
+
+.usuario-invitado-linea small,
+.reserva-card-row-block small{
+    display: block;
+    color: #667085;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.usuario-card-actions small{
+    display: block;
+    text-align: center;
+    color: #667085;
+    font-weight: 700;
+    margin-top: -4px;
+}
+
+@media (max-width: 1199px){
+    .admin-reservas-grid,
+    .mis-reservas-grid{
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px){
+    .admin-reservas-grid,
+    .mis-reservas-grid{
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .admin-reserva-card,
+    .usuario-reserva-card{
+        border-radius: 20px;
+        padding: 14px;
+    }
+
+    .admin-reserva-card-head h3{
+        font-size: .98rem;
+    }
+
+    .reserva-card-row{
+        gap: 10px;
+    }
+
+    .reserva-card-row strong{
+        font-size: .86rem;
+    }
+
+    .admin-card-actions .admin-status-form{
+        grid-template-columns: 1fr auto;
+        padding: 6px;
+    }
+
+    .admin-card-actions .admin-btn,
+    .admin-card-actions .admin-status-select,
+    .usuario-card-actions .admin-btn{
+        min-height: 36px;
+        padding: 8px 10px;
+        font-size: .82rem;
+    }
+}
+
+
+/* Resumen de reservas por bloques/opciones */
+.reservas-bloques-resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.reservas-bloque-card {
+    padding: 22px;
+}
+
+.reservas-bloque-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.reservas-bloque-head h2 {
+    margin: 0;
+    color: #111827;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.reservas-bloque-opciones {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.reservas-bloque-opcion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #e8edf5;
+    border-radius: 14px;
+}
+
+.reservas-bloque-opcion span {
+    color: #4b5568;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.reservas-bloque-opcion strong {
+    min-width: 42px;
+    text-align: center;
+    color: #0f172a;
+    font-size: 22px;
+    font-weight: 900;
+}
+
+@media (max-width: 1200px) {
+    .reservas-bloques-resumen {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .reservas-bloques-resumen {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Recuento por bloques en detalle del acto */
+.acto-bloques-resumen {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.acto-bloque-card {
+    background: #ffffff;
+    border: 1px solid #e8edf5;
+    border-radius: 18px;
+}
+
+.acto-bloque-opcion {
+    align-items: flex-start;
+}
+
+.acto-bloque-opcion > div {
+    flex: 1;
+}
+
+.acto-bloque-opcion span {
+    display: inline-block;
 }

@@ -10,7 +10,6 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_csrf();
     check_honeypot();
-    check_turnstile();
 
     $dni = trim($_POST['dni'] ?? '');
 
@@ -83,7 +82,6 @@ include __DIR__ . '/header.php';
             >
         </div>
 
-        <?= turnstile_widget() ?>
 
         <button class="btn btn-primary w-100 btn-lg" type="submit">
             Entrar

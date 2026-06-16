@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/comidas_helpers.php';
+ensure_comidas_multiples_schema($pdo);
 require_admin();
 
 $familiaId = (int) ($_GET['id'] ?? 0);

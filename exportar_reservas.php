@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/comidas_helpers.php';
+ensure_comidas_multiples_schema($pdo);
 require_admin();
 $acto_id = (int)($_GET['acto_id'] ?? 0);
 if (!$acto_id) { exit('Acto no indicado'); }
@@ -18,6 +20,8 @@ $reservas = $stmt->fetchAll();
 
 $reservaIds = array_map(static fn($r) => (int)$r['id'], $reservas);
 $invitadosPorReserva = [];
+$opcionesTextoPorReserva = [];
+$opcionesTextoPorInvitado = [];
 if ($reservaIds) {
     $ph = implode(',', array_fill(0, count($reservaIds), '?'));
     $stmtInv = $pdo->prepare("SELECT ri.*, oc.nombre AS opcion FROM reserva_invitados ri LEFT JOIN opciones_comida oc ON oc.id=ri.opcion_comida_id WHERE ri.reserva_id IN ($ph) ORDER BY ri.id ASC");
@@ -25,12 +29,23 @@ if ($reservaIds) {
     foreach ($stmtInv->fetchAll() as $inv) {
         $invitadosPorReserva[(int)$inv['reserva_id']][] = $inv;
     }
+    $stmtRO = $pdo->prepare("SELECT ro.reserva_id, ro.categoria, oc.nombre FROM reserva_opciones ro INNER JOIN opciones_comida oc ON oc.id=ro.opcion_comida_id WHERE ro.reserva_id IN ($ph) ORDER BY ro.categoria, oc.id");
+    $stmtRO->execute($reservaIds);
+    foreach ($stmtRO->fetchAll() as $ro) $opcionesTextoPorReserva[(int)$ro['reserva_id']][] = $ro['categoria'] . ': ' . $ro['nombre'];
+    $invIds = [];
+    foreach ($invitadosPorReserva as $lista) foreach ($lista as $invTmp) $invIds[] = (int)$invTmp['id'];
+    if ($invIds) {
+        $iph = implode(',', array_fill(0, count($invIds), '?'));
+        $stmtIO = $pdo->prepare("SELECT rio.reserva_invitado_id, rio.categoria, oc.nombre FROM reserva_invitado_opciones rio INNER JOIN opciones_comida oc ON oc.id=rio.opcion_comida_id WHERE rio.reserva_invitado_id IN ($iph) ORDER BY rio.categoria, oc.id");
+        $stmtIO->execute($invIds);
+        foreach ($stmtIO->fetchAll() as $io) $opcionesTextoPorInvitado[(int)$io['reserva_invitado_id']][] = $io['categoria'] . ': ' . $io['nombre'];
+    }
 }
 
 foreach ($reservas as $r) {
     $fallero = trim($r['nombre'].' '.$r['apellidos']);
-    fputcsv($out, [$titulo, $fallero, 'Fallero/a', $r['dni'], $r['opcion'] ?: 'Sin opción', '-', $r['estado'], ((int)$r['pagada']?'Sí':'No'), ((int)$r['qr_usado']?'Sí':'No'), $r['fecha_reserva']], ';');
+    fputcsv($out, [$titulo, $fallero, 'Fallero/a', $r['dni'], (!empty($opcionesTextoPorReserva[(int)$r['id']]) ? implode(' · ', $opcionesTextoPorReserva[(int)$r['id']]) : ($r['opcion'] ?: 'Sin opción')), '-', $r['estado'], ((int)$r['pagada']?'Sí':'No'), ((int)$r['qr_usado']?'Sí':'No'), $r['fecha_reserva']], ';');
     foreach (($invitadosPorReserva[(int)$r['id']] ?? []) as $inv) {
-        fputcsv($out, [$titulo, $inv['nombre'], 'Invitado/a '.($inv['tipo'] ?: ''), '', $inv['opcion'] ?: 'Sin opción', $fallero, $r['estado'], ((int)$r['pagada']?'Sí':'No'), ((int)$r['qr_usado']?'Sí':'No'), $r['fecha_reserva']], ';');
+        fputcsv($out, [$titulo, $inv['nombre'], 'Invitado/a '.($inv['tipo'] ?: ''), '', (!empty($opcionesTextoPorInvitado[(int)$inv['id']]) ? implode(' · ', $opcionesTextoPorInvitado[(int)$inv['id']]) : ($inv['opcion'] ?: 'Sin opción')), $fallero, $r['estado'], ((int)$r['pagada']?'Sí':'No'), ((int)$r['qr_usado']?'Sí':'No'), $r['fecha_reserva']], ';');
     }
 }

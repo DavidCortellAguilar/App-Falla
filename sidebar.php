@@ -93,6 +93,10 @@ function menu_active(string $page, string $currentPage): string
                 <span>✅</span><span>Mis reservas</span>
             </a>
 
+            <a href="juntas.php" class="menu-link<?= in_array($currentPage, ['juntas.php','junta_detalle.php']) ? ' active' : '' ?>">
+                <span>📋</span><span>Juntas</span>
+            </a>
+
             <a href="mi_familia.php" class="menu-link<?= menu_active('mi_familia.php', $currentPage) ?>">
                 <span>👨‍👩‍👧</span><span>Mi Familia</span>
             </a>

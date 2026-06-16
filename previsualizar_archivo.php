@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_admin();
+require_login();
 require_once __DIR__ . '/juntas_helper.php';
 ensure_juntas_tables($pdo);
 

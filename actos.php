@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/comidas_helpers.php';
+ensure_comidas_multiples_schema($pdo);
 require_admin();
 ensure_audit_columns($pdo);
 
@@ -132,75 +134,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $actoId = (int) $pdo->lastInsertId();
     }
 
-    if (isset($_POST['opcion_nombre']) && is_array($_POST['opcion_nombre'])) {
+    if (isset($_POST['opciones_form_present'])) {
         $opcionIds = $_POST['opcion_id'] ?? [];
         $opcionNombres = $_POST['opcion_nombre'] ?? [];
         $opcionPlazas = $_POST['opcion_plazas'] ?? [];
+        $opcionCategorias = $_POST['opcion_categoria'] ?? [];
         $opcionDescripciones = $_POST['opcion_descripcion'] ?? [];
         $idsConservados = [];
 
-        foreach ($opcionNombres as $i => $nombre) {
-            $nombre = trim((string) $nombre);
-            $opcionId = (int) ($opcionIds[$i] ?? 0);
-            $maxPlazas = trim((string) ($opcionPlazas[$i] ?? ''));
-            $descripcion = trim((string) ($opcionDescripciones[$i] ?? ''));
+        if (is_array($opcionNombres)) {
+            foreach ($opcionNombres as $i => $nombre) {
+                $nombre = trim((string) $nombre);
+                $opcionId = (int) ($opcionIds[$i] ?? 0);
+                $maxPlazas = trim((string) ($opcionPlazas[$i] ?? ''));
+                $categoria = trim((string) ($opcionCategorias[$i] ?? '')) ?: 'Comida';
+                $descripcion = trim((string) ($opcionDescripciones[$i] ?? ''));
 
-            if ($nombre === '') {
-                continue;
-            }
+                if ($nombre === '') {
+                    continue;
+                }
 
-            $params = [
-                'acto_id' => $actoId,
-                'nombre' => $nombre,
-                'descripcion' => $descripcion,
-                'max_plazas' => $maxPlazas !== '' ? (int) $maxPlazas : null,
-            ];
+                $params = [
+                    'acto_id' => $actoId,
+                    'nombre' => $nombre,
+                    'categoria' => $categoria,
+                    'descripcion' => $descripcion,
+                    'max_plazas' => $maxPlazas !== '' ? (int) $maxPlazas : null,
+                ];
 
-            if ($opcionId > 0) {
-                $params['id'] = $opcionId;
+                if ($opcionId > 0) {
+                    $params['id'] = $opcionId;
 
-                $pdo->prepare("
-                    UPDATE opciones_comida
-                    SET nombre=:nombre,
-                        descripcion=:descripcion,
-                        max_plazas=:max_plazas,
-                        is_active=1
-                    WHERE id=:id AND acto_id=:acto_id
-                ")->execute($params);
+                    $pdo->prepare("
+                        UPDATE opciones_comida
+                        SET nombre=:nombre,
+                            categoria=:categoria,
+                            descripcion=:descripcion,
+                            max_plazas=:max_plazas,
+                            is_active=1
+                        WHERE id=:id AND acto_id=:acto_id
+                    ")->execute($params);
 
-                $idsConservados[] = $opcionId;
-            } else {
-                $pdo->prepare("
-                    INSERT INTO opciones_comida (acto_id, nombre, descripcion, max_plazas, is_active)
-                    VALUES (:acto_id, :nombre, :descripcion, :max_plazas, 1)
-                ")->execute($params);
+                    $idsConservados[] = $opcionId;
+                } else {
+                    $pdo->prepare("
+                        INSERT INTO opciones_comida (acto_id, categoria, nombre, descripcion, max_plazas, is_active)
+                        VALUES (:acto_id, :categoria, :nombre, :descripcion, :max_plazas, 1)
+                    ")->execute($params);
 
-                $idsConservados[] = (int) $pdo->lastInsertId();
+                    $idsConservados[] = (int) $pdo->lastInsertId();
+                }
             }
         }
 
+        $notInSql = '';
+        $extraParams = [];
         if ($idsConservados) {
-            $placeholders = implode(',', array_fill(0, count($idsConservados), '?'));
-            $deleteParams = array_merge([$actoId], $idsConservados);
-
-            $pdo->prepare("
-                DELETE oc FROM opciones_comida oc
-                LEFT JOIN reservas r ON r.opcion_comida_id = oc.id
-                WHERE oc.acto_id = ?
-                  AND oc.id NOT IN ($placeholders)
-                  AND r.id IS NULL
-            ")->execute($deleteParams);
-
-            $inactiveParams = array_merge([$actoId], $idsConservados);
-
-            $pdo->prepare("
-                UPDATE opciones_comida oc
-                SET oc.is_active = 0
-                WHERE oc.acto_id = ?
-                  AND oc.id NOT IN ($placeholders)
-                  AND EXISTS (SELECT 1 FROM reservas r WHERE r.opcion_comida_id = oc.id)
-            ")->execute($inactiveParams);
+            $notInSql = 'AND oc.id NOT IN (' . implode(',', array_fill(0, count($idsConservados), '?')) . ')';
+            $extraParams = $idsConservados;
         }
+
+        $paramsDelete = array_merge([$actoId], $extraParams);
+        $pdo->prepare("
+            DELETE oc FROM opciones_comida oc
+            LEFT JOIN reservas r ON r.opcion_comida_id = oc.id OR r.invitado_opcion_comida_id = oc.id
+            LEFT JOIN reserva_invitados ri ON ri.opcion_comida_id = oc.id
+            LEFT JOIN reserva_opciones ro ON ro.opcion_comida_id = oc.id
+            LEFT JOIN reserva_invitado_opciones rio ON rio.opcion_comida_id = oc.id
+            WHERE oc.acto_id = ?
+              $notInSql
+              AND r.id IS NULL
+              AND ri.id IS NULL
+              AND ro.id IS NULL
+              AND rio.id IS NULL
+        ")->execute($paramsDelete);
+
+        $paramsInactive = array_merge([$actoId], $extraParams);
+        $pdo->prepare("
+            UPDATE opciones_comida oc
+            SET oc.is_active = 0
+            WHERE oc.acto_id = ?
+              $notInSql
+              AND (
+                  EXISTS (SELECT 1 FROM reservas r WHERE r.opcion_comida_id = oc.id OR r.invitado_opcion_comida_id = oc.id)
+                  OR EXISTS (SELECT 1 FROM reserva_invitados ri WHERE ri.opcion_comida_id = oc.id)
+                  OR EXISTS (SELECT 1 FROM reserva_opciones ro WHERE ro.opcion_comida_id = oc.id)
+                  OR EXISTS (SELECT 1 FROM reserva_invitado_opciones rio WHERE rio.opcion_comida_id = oc.id)
+              )
+        ")->execute($paramsInactive);
     }
 
     log_activity(
@@ -234,7 +255,7 @@ if (!empty($_GET['edit'])) {
     $edit = $stmt->fetch();
 
     if ($edit) {
-        $stmt = $pdo->prepare("SELECT * FROM opciones_comida WHERE acto_id=:acto_id ORDER BY id ASC");
+        $stmt = $pdo->prepare("SELECT * FROM opciones_comida WHERE acto_id=:acto_id ORDER BY categoria ASC, id ASC");
         $stmt->execute(['acto_id' => (int) $edit['id']]);
         $opcionesEdit = $stmt->fetchAll();
     }
@@ -475,26 +496,48 @@ include __DIR__ . '/sidebar.php';
                     </div>
 
                     <div class="form-field-full">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <label class="form-label mb-0">Opciones internas del acto</label>
-                            <button class="btn btn-sm btn-light" type="button" onclick="addOptionRow()">+ Añadir</button>
+                        <input type="hidden" name="opciones_form_present" value="1">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <div>
+                                <label class="form-label mb-0">Bloques y opciones del acto</label>
+                                <small class="text-muted d-block">Crea bloques como Comida, Merienda o Cena, y añade sus opciones dentro.</small>
+                            </div>
+                            <button class="btn btn-sm btn-primary" type="button" data-food-action="add-block">+ Añadir bloque</button>
                         </div>
 
-                        <div id="optionsRows" class="options-rows">
+                        <div id="foodBlocks" class="food-blocks">
                             <?php
-                            $rows = $opcionesEdit ?: [
-                                ['id' => '', 'nombre' => '', 'descripcion' => '', 'max_plazas' => ''],
-                                ['id' => '', 'nombre' => '', 'descripcion' => '', 'max_plazas' => ''],
-                            ];
-
-                            foreach ($rows as $opcion):
+                            $rows = $opcionesEdit ?: [];
+                            $bloques = [];
+                            foreach ($rows as $opcion) {
+                                $categoria = trim((string)($opcion['categoria'] ?? '')) ?: 'Comida';
+                                $bloques[$categoria][] = $opcion;
+                            }
+                            foreach ($bloques as $categoria => $opcionesBloque):
                             ?>
-                                <div class="option-row">
-                                    <input type="hidden" name="opcion_id[]" value="<?= e((string)($opcion['id'] ?? '')) ?>">
-                                    <input class="form-control" name="opcion_nombre[]" placeholder="Opción. Ej. Paella" value="<?= e($opcion['nombre'] ?? '') ?>">
-                                    <input class="form-control" name="opcion_plazas[]" type="number" placeholder="Plazas" value="<?= e((string)($opcion['max_plazas'] ?? '')) ?>">
-                                    <input class="form-control" name="opcion_descripcion[]" placeholder="Descripción opcional" value="<?= e($opcion['descripcion'] ?? '') ?>">
-                                    <button class="btn btn-outline-danger" type="button" onclick="removeOptionRow(this)">×</button>
+                                <div class="food-block">
+                                    <div class="food-block-header">
+                                        <div class="food-block-title-wrap">
+                                            <label class="form-label">Nombre del bloque</label>
+                                            <input class="form-control food-block-title" value="<?= e($categoria) ?>" placeholder="Ej. Comida, Merienda, Cena">
+                                        </div>
+                                        <button class="btn btn-outline-danger btn-sm" type="button" data-food-action="remove-block">Eliminar bloque</button>
+                                    </div>
+
+                                    <div class="food-block-options">
+                                        <?php foreach ($opcionesBloque as $opcion): ?>
+                                            <div class="option-row">
+                                                <input type="hidden" name="opcion_id[]" value="<?= e((string)($opcion['id'] ?? '')) ?>">
+                                                <input type="hidden" class="js-option-category" name="opcion_categoria[]" value="<?= e($categoria) ?>">
+                                                <input class="form-control" name="opcion_nombre[]" placeholder="Opción. Ej. Paella" value="<?= e($opcion['nombre'] ?? '') ?>">
+                                                <input class="form-control" name="opcion_plazas[]" type="number" placeholder="Plazas" value="<?= e((string)($opcion['max_plazas'] ?? '')) ?>">
+                                                <input class="form-control" name="opcion_descripcion[]" placeholder="Descripción opcional" value="<?= e($opcion['descripcion'] ?? '') ?>">
+                                                <button class="btn btn-outline-danger" type="button" data-food-action="remove-option">×</button>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+
+                                    <button class="btn btn-light btn-sm mt-2" type="button" data-food-action="add-option">+ Añadir opción a este bloque</button>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -534,7 +577,7 @@ include __DIR__ . '/sidebar.php';
                             <div class="acto-card-meta">
                                 <span><?= e($acto['tipo']) ?></span>
                                 <span><?= e((string)$acto['reservas_confirmadas']) ?> reservas</span>
-                                <span><?= e((string)$acto['opciones']) ?> opciones</span>
+                                <span><?= e((string)$acto['opciones']) ?> opciones de comida</span>
                             </div>
 
                             <div class="acto-card-link">Ver detalle y recuentos →</div>
@@ -557,5 +600,103 @@ include __DIR__ . '/sidebar.php';
 
     </section>
 </main>
+
+
+<script>
+(function () {
+    if (window.__foodBlocksReady) return;
+    window.__foodBlocksReady = true;
+
+    function getBlockName(block) {
+        const input = block ? block.querySelector('.food-block-title') : null;
+        const value = input ? input.value.trim() : '';
+        return value || 'Comida';
+    }
+
+    function syncBlock(block) {
+        if (!block) return;
+        const categoria = getBlockName(block);
+        block.querySelectorAll('.js-option-category').forEach(function (input) {
+            input.value = categoria;
+        });
+    }
+
+    function createOption(categoria) {
+        const row = document.createElement('div');
+        row.className = 'option-row';
+        row.innerHTML = '<input type="hidden" name="opcion_id[]" value="">' +
+            '<input type="hidden" class="js-option-category" name="opcion_categoria[]" value="">' +
+            '<input class="form-control" name="opcion_nombre[]" placeholder="Opción. Ej. Paella">' +
+            '<input class="form-control" name="opcion_plazas[]" type="number" placeholder="Plazas">' +
+            '<input class="form-control" name="opcion_descripcion[]" placeholder="Descripción opcional">' +
+            '<button class="btn btn-outline-danger" type="button" data-food-action="remove-option">×</button>';
+        row.querySelector('.js-option-category').value = categoria;
+        return row;
+    }
+
+    window.addFoodBlock = window.addFoodBlock || function () {
+        const wrapper = document.getElementById('foodBlocks');
+        if (!wrapper) return;
+        const block = document.createElement('div');
+        block.className = 'food-block';
+        block.innerHTML = '<div class="food-block-header">' +
+            '<div class="food-block-title-wrap">' +
+            '<label class="form-label">Nombre del bloque</label>' +
+            '<input class="form-control food-block-title" value="" placeholder="Ej. Comida, Merienda, Cena">' +
+            '</div>' +
+            '<button class="btn btn-outline-danger btn-sm" type="button" data-food-action="remove-block">Eliminar bloque</button>' +
+            '</div>' +
+            '<div class="food-block-options"></div>' +
+            '<button class="btn btn-light btn-sm mt-2" type="button" data-food-action="add-option">+ Añadir opción a este bloque</button>';
+        wrapper.appendChild(block);
+        block.querySelector('.food-block-options').appendChild(createOption('Comida'));
+        const title = block.querySelector('.food-block-title');
+        if (title) title.focus();
+    };
+
+    window.addOptionToBlock = window.addOptionToBlock || function (button) {
+        const block = button.closest('.food-block');
+        if (!block) return;
+        syncBlock(block);
+        const list = block.querySelector('.food-block-options');
+        const row = createOption(getBlockName(block));
+        list.appendChild(row);
+        const input = row.querySelector('input[name="opcion_nombre[]"]');
+        if (input) input.focus();
+    };
+
+    window.removeFoodBlock = window.removeFoodBlock || function (button) {
+        const block = button.closest('.food-block');
+        if (block) block.remove();
+    };
+
+    window.removeOptionRow = window.removeOptionRow || function (button) {
+        const row = button.closest('.option-row');
+        if (row) row.remove();
+    };
+
+    document.addEventListener('click', function (event) {
+        const btn = event.target.closest('[data-food-action]');
+        if (!btn) return;
+        event.preventDefault();
+        const action = btn.getAttribute('data-food-action');
+        if (action === 'add-block') window.addFoodBlock();
+        if (action === 'add-option') window.addOptionToBlock(btn);
+        if (action === 'remove-block') window.removeFoodBlock(btn);
+        if (action === 'remove-option') window.removeOptionRow(btn);
+    });
+
+    document.addEventListener('input', function (event) {
+        if (event.target && event.target.classList.contains('food-block-title')) {
+            syncBlock(event.target.closest('.food-block'));
+        }
+    });
+
+    document.addEventListener('submit', function (event) {
+        if (!event.target || !event.target.querySelector('#foodBlocks')) return;
+        event.target.querySelectorAll('.food-block').forEach(syncBlock);
+    });
+})();
+</script>
 
 <?php include __DIR__ . '/footer.php'; ?>

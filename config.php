@@ -224,6 +224,10 @@ function audit_html(?string $createdName, ?string $createdAt, ?string $updatedNa
 
 function ensure_audit_columns(PDO $pdo): void
 {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
     $statements = [
         "ALTER TABLE actos ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
         "ALTER TABLE avisos ADD COLUMN IF NOT EXISTS updated_by INT(11) DEFAULT NULL AFTER updated_at",
